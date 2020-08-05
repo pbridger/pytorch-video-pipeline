@@ -8,9 +8,9 @@ from gi.repository import Gst
 Gst.init()
 
 pipeline = Gst.parse_launch('''
-    filesrc location=media/in.mp4 num-buffers=100 !
+    filesrc location=media/in.mp4 !
     decodebin !
-    fakesink sync=true name=s
+    fakesink name=s
 ''')
 
 
