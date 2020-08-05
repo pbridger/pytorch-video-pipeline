@@ -33,5 +33,5 @@ while True:
     if message.type in (Gst.MessageType.EOS, Gst.MessageType.ERROR):
         break
 
-Gst.debug_bin_to_dot_file(pipeline, Gst.DebugGraphDetails.ALL, 'FINALLY')
+Gst.debug_bin_to_dot_file(pipeline, Gst.DebugGraphDetails.ALL, 'EXIT')
 pipeline.set_state(Gst.State.NULL)
