@@ -1,6 +1,4 @@
 
-import os, sys
-
 import numpy as np
 import torch, torchvision
 
@@ -68,7 +66,6 @@ pipeline.get_by_name('s').get_static_pad('sink').add_probe(
     on_frame_probe
 )
 
-
 pipeline.set_state(Gst.State.PLAYING)
 
 try:
@@ -77,7 +74,7 @@ try:
         if msg is None: continue
 
         structure = msg.get_structure()
-        print(f'Message from {msg.src.name} [{Gst.msg(msg.type)}] {structure.to_string() if structure else ""}')
+        print(f'Message from {msg.src.name} [{Gst.message_type_get_name(msg.type)}] {structure.to_string() if structure else ""}')
 
         if msg.type in (Gst.MessageType.EOS, Gst.MessageType.ERROR):
             break
