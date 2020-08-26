@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/deepstream:5.0-dp-20.04-base
+FROM nvcr.io/nvidia/deepstream:5.0-20.07-triton
 
 RUN apt-get update && apt install --no-install-recommends -y \
     ca-certificates \
@@ -16,6 +16,11 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
 
 ENV PATH /opt/conda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/cuda-10.2/compat:${LD_LIBRARY_PATH}
+
+RUN conda install -y -c pytorch \
+    cudatoolkit=10.2 \
+    pytorch \
+    torchvision
 
 RUN conda install -y -c conda-forge \
     pygobject

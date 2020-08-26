@@ -7,6 +7,7 @@ container:
 
 run-container: container
 	docker run -it --rm \
+		--gpus=all \
 		--privileged=true \
 		--ipc=host \
 		-v $(shell pwd):/app \
@@ -16,6 +17,7 @@ run-container: container
 run-simple-cli: container
 	# run simple pipeline from CLI using gst-launch-1.0
 	docker run -it --rm \
+		--gpus=all \
 		--privileged=true \
 		--ipc=host \
 		-v $(shell pwd):/app \
@@ -26,6 +28,7 @@ run-simple-cli: container
 run-simple: container
 	# run simple.py in container
 	docker run -it --rm \
+		--gpus=all \
 		--privileged=true \
 		--ipc=host \
 		-v $(shell pwd):/app \
