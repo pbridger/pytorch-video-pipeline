@@ -1,38 +1,23 @@
 
+DOCKER_CMD := docker run -it --rm --gpus=all --privileged=true --ipc=host -v $(shell pwd):/app
+DOCKER_PY_CMD := ${DOCKER_CMD} --entrypoint=python
 
-container:
-	# create/get docker container
+
+build-container:
 	docker build -f docker/Dockerfile -t pytorch-video-pipeline:latest .
 
 
-run-container: container
-	docker run -it --rm \
-		--gpus=all \
-		--privileged=true \
-		--ipc=host \
-		-v $(shell pwd):/app \
-		pytorch-video-pipeline:latest
+run-container: build-container
+	${DOCKER_CMD} pytorch-video-pipeline:latest
 
 
-run-simple-cli: container
-	# run simple pipeline from CLI using gst-launch-1.0
-	docker run -it --rm \
-		--gpus=all \
-		--privileged=true \
-		--ipc=host \
-		-v $(shell pwd):/app \
-		pytorch-video-pipeline:latest \
-		gst-launch-1.0 filesrc location=media/in.mp4 ! decodebin ! progressreport update-freq=1 ! fakesink sync=true
+logs/%.pipeline.dot: %.py
+	${DOCKER_PY_CMD} pytorch-video-pipeline:latest $<
 
 
-run-simple: container
-	# run simple.py in container
-	docker run -it --rm \
-		--gpus=all \
-		--privileged=true \
-		--ipc=host \
-		-v $(shell pwd):/app \
-		pytorch-video-pipeline:latest \
-		python simple.py
+logs/%.pipeline.png: logs/%.pipeline.dot
+	dot -Tpng -o$@ $< && rm -f $<
 
+
+all: logs/frames_into_python.pipeline.png logs/frames_into_pytorch.pipeline.png
 

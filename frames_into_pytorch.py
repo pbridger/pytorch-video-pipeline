@@ -1,10 +1,10 @@
 
+import os, sys
 import numpy as np
 import torch, torchvision
 
 import gi
 gi.require_version('Gst', '1.0')
-
 from gi.repository import Gst
 
 Gst.init()
@@ -79,6 +79,8 @@ try:
         if msg.type in (Gst.MessageType.EOS, Gst.MessageType.ERROR):
             break
 finally:
-    Gst.debug_bin_to_dot_file(pipeline, Gst.DebugGraphDetails.ALL, 'DONE')
+    open(f'logs/{os.path.splitext(sys.argv[0])[0]}.pipeline.dot', 'w').write(
+        Gst.debug_bin_to_dot_data(pipeline, Gst.DebugGraphDetails.ALL)
+    )
     pipeline.set_state(Gst.State.NULL)
 
