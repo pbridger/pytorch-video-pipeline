@@ -28,6 +28,9 @@ RUN conda install -y -c conda-forge \
 # Gstreamer debug output location
 env GST_DEBUG_DUMP_DOT_DIR=/app/logs
 
+RUN python -c "import torch; torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math='fp32')" 2>/dev/null | :
+RUN python -c "import torch; torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math='fp16')" 2>/dev/null | :
+
 RUN rm -rf /var/lib/apt/lists/* && \
     conda clean -afy
 
