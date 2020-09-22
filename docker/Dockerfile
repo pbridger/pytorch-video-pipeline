@@ -23,7 +23,8 @@ RUN conda install -y -c pytorch \
     torchvision
 
 RUN conda install -y -c conda-forge \
-    pygobject
+    pygobject \
+    scikit-image
 
 # Gstreamer debug output location
 env GST_DEBUG_DUMP_DOT_DIR=/app/logs

@@ -1,6 +1,8 @@
 
 DOCKER_CMD := docker run -it --rm --gpus=all --privileged=true --ipc=host -v $(shell pwd):/app
 DOCKER_PY_CMD := ${DOCKER_CMD} --entrypoint=python
+DOCKER_NSYS_CMD := ${DOCKER_CMD} --entrypoint=nsys
+PROFILE_CMD := profile -t cuda,cublas,cudnn,nvtx,osrt --force-overwrite=true --delay=6
 
 .PHONY: sleep
 
@@ -19,6 +21,10 @@ logs/cli.pipeline.dot:
 
 logs/%.pipeline.dot: %.py
 	${DOCKER_PY_CMD} pytorch-video-pipeline:latest $<
+
+
+logs/%.qdrep: %.py
+	${DOCKER_NSYS_CMD} pytorch-video-pipeline:latest ${PROFILE_CMD} -o $@ python $<
 
 
 %.pipeline.png: logs/%.pipeline.dot
