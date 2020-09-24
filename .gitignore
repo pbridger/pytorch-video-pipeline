@@ -2,6 +2,7 @@ media
 logs/*
 core
 *DS_Store*
+*qdrep
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -92,7 +92,7 @@ def normalize(input_tensor):
 
 def postprocess(locs, labels):
     with nvtx_range('postprocess'):
-        results_batch = ssd_utils.decode_results((locs, labels))
+        results_batch = ssd_utils.decode_results((locs.cpu(), labels.cpu()))
         results_batch = [ssd_utils.pick_best(results, detection_threshold) for results in results_batch]
         for bboxes, classes, scores in results_batch:
             if scores.shape[0] > 0:
