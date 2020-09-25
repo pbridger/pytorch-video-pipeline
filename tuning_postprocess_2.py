@@ -175,12 +175,12 @@ def postprocess(locs, labels):
             flat_locs,
             flat_probs,
             class_indexes,
-            0.7
+            iou_threshold=0.7
         )
 
-        bboxes = flat_locs[nms_mask]
-        probs = flat_probs[nms_mask]
-        class_indexes = class_indexes[nms_mask]
+        bboxes = flat_locs[nms_mask].cpu()
+        probs = flat_probs[nms_mask].cpu()
+        class_indexes = class_indexes[nms_mask].cpu()
         if bboxes.size(0) > 0:
             print(bboxes, class_indexes, probs)
 
