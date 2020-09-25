@@ -7,9 +7,9 @@ from gi.repository import Gst
 import numpy as np
 import torch, torchvision
 
-frame_format, pixel_bytes = 'RGBA', 4
+frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp32'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-detector = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math='fp32').eval().to(device)
+detector = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=model_precision).eval().to(device)
 ssd_utils = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd_processing_utils')
 detection_threshold = 0.4
 start_time, frames_processed = None, 0

@@ -1,5 +1,6 @@
 import os, sys
-import time
+import math, time
+import itertools
 import contextlib
 import gi
 gi.require_version('Gst', '1.0')
@@ -90,13 +91,98 @@ def normalize(input_tensor):
     return (2.0 * input_tensor) - 1.0
 
 
+def init_dboxes():
+    'adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Detection/SSD/src/utils.py'
+    fig_size = 300
+    feat_size = [38, 19, 10, 5, 3, 1]
+    steps = [8, 16, 32, 64, 100, 300]
+    scales = [21, 45, 99, 153, 207, 261, 315]
+    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
+
+    fk = fig_size / np.array(steps)
+
+    dboxes = []
+    # size of feature and number of feature
+    for idx, sfeat in enumerate(feat_size):
+        sk1 = scales[idx] / fig_size
+        sk2 = scales[idx + 1] / fig_size
+        sk3 = math.sqrt(sk1 * sk2)
+        all_sizes = [(sk1, sk1), (sk3, sk3)]
+
+        for alpha in aspect_ratios[idx]:
+            w, h = sk1 * math.sqrt(alpha), sk1 / math.sqrt(alpha)
+            all_sizes.append((w, h))
+            all_sizes.append((h, w))
+
+        for w, h in all_sizes:
+            for i, j in itertools.product(range(sfeat), repeat=2):
+                cx, cy = (j + 0.5) / fk[idx], (i + 0.5) / fk[idx]
+                dboxes.append((cx, cy, w, h))
+
+    return torch.tensor(
+        dboxes,
+        dtype=(torch.float16 if model_precision == 'fp16' else torch.float32),
+        device=device
+    ).clamp(0, 1)
+
+
+dboxes_xywh = init_dboxes().unsqueeze(dim=0)
+scale_xy = 0.1
+scale_wh = 0.2
+
+
+def xywh_to_xyxy(bboxes_batch, scores_batch):
+    bboxes_batch = bboxes_batch.permute(0, 2, 1)
+    scores_batch = scores_batch.permute(0, 2, 1)
+
+    bboxes_batch[:, :, :2] = scale_xy * bboxes_batch[:, :, :2]
+    bboxes_batch[:, :, 2:] = scale_wh * bboxes_batch[:, :, 2:]
+
+    bboxes_batch[:, :, :2] = bboxes_batch[:, :, :2] * dboxes_xywh[:, :, 2:] + dboxes_xywh[:, :, :2]
+    bboxes_batch[:, :, 2:] = bboxes_batch[:, :, 2:].exp() * dboxes_xywh[:, :, 2:]
+
+    # transform format to ltrb
+    l, t, r, b = bboxes_batch[:, :, 0] - 0.5 * bboxes_batch[:, :, 2],\
+                 bboxes_batch[:, :, 1] - 0.5 * bboxes_batch[:, :, 3],\
+                 bboxes_batch[:, :, 0] + 0.5 * bboxes_batch[:, :, 2],\
+                 bboxes_batch[:, :, 1] + 0.5 * bboxes_batch[:, :, 3]
+
+    bboxes_batch[:, :, 0] = l
+    bboxes_batch[:, :, 1] = t
+    bboxes_batch[:, :, 2] = r
+    bboxes_batch[:, :, 3] = b
+
+    return bboxes_batch, torch.nn.functional.softmax(scores_batch, dim=-1)
+
+
 def postprocess(locs, labels):
     with nvtx_range('postprocess'):
-        results_batch = ssd_utils.decode_results((locs, labels))
-        results_batch = [ssd_utils.pick_best(results, detection_threshold) for results in results_batch]
-        for bboxes, classes, scores in results_batch:
-            if scores.shape[0] > 0:
-                print(bboxes, classes, scores)
+        locs, probs = xywh_to_xyxy(locs, labels)
+
+        # flatten batch and classes
+        batch_dim, box_dim, class_dim = probs.size()
+        flat_locs = locs.reshape(-1, 4).repeat_interleave(class_dim, dim=0)
+        flat_probs = probs.view(-1)
+        class_indexes = torch.arange(class_dim, device=device).repeat(batch_dim * box_dim)
+
+        # only do NMS on detections over threshold, and ignore background (0)
+        threshold_mask = (flat_probs > detection_threshold) & (class_indexes > 0)
+        flat_locs = flat_locs[threshold_mask]
+        flat_probs = flat_probs[threshold_mask]
+        class_indexes = class_indexes[threshold_mask]
+
+        nms_mask = torchvision.ops.boxes.batched_nms(
+            flat_locs,
+            flat_probs,
+            class_indexes,
+            0.7
+        )
+
+        bboxes = flat_locs[nms_mask]
+        probs = flat_probs[nms_mask]
+        class_indexes = class_indexes[nms_mask]
+        if bboxes.size(0) > 0:
+            print(bboxes, class_indexes, probs)
 
 
 Gst.init()
