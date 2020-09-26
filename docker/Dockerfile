@@ -15,7 +15,7 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
 ENV PATH /opt/conda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/cuda-10.2/compat:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /usr/local/cuda-10.2/compat:/opt/conda/lib:${LD_LIBRARY_PATH}
 
 RUN conda install -y -c pytorch \
     cudatoolkit=10.2 \
@@ -25,6 +25,11 @@ RUN conda install -y -c pytorch \
 RUN conda install -y -c conda-forge \
     pygobject \
     scikit-image
+
+# Nvidia Apex for mixed-precision inference
+RUN git clone https://github.com/NVIDIA/apex.git /build/apex
+WORKDIR /build/apex
+RUN pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" .
 
 # Gstreamer debug output location
 env GST_DEBUG_DUMP_DOT_DIR=/app/logs

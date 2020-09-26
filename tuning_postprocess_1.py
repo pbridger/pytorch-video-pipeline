@@ -1,5 +1,5 @@
 import os, sys
-import time
+import math, time
 import contextlib
 import gi
 gi.require_version('Gst', '1.0')
@@ -8,6 +8,7 @@ import numpy as np
 import torch, torchvision
 
 frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp32'
+model_dtype = torch.float16 if model_precision == 'fp16' else torch.float32
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 detector = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=model_precision).eval().to(device)
 ssd_utils = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd_processing_utils')
@@ -33,7 +34,7 @@ def on_frame_probe(pad, info):
         print(f'[{buf.pts / Gst.SECOND:6.2f}]')
 
         image_tensor = buffer_to_image_tensor(buf, pad.get_current_caps())
-        image_batch = preprocess(image_tensor).unsqueeze(0).to(device)
+        image_batch = preprocess(image_tensor.unsqueeze(0))
         frames_processed += image_batch.size(0)
 
         with torch.no_grad():
@@ -64,10 +65,10 @@ def buffer_to_image_tensor(buf, caps):
                 buf.unmap(map_info)
 
 
-def preprocess(image_tensor):
+def preprocess(image_batch):
     '300x300 centre crop, normalize, HWC -> CHW'
     with nvtx_range('preprocess'):
-        image_height, image_width, image_depth = image_tensor.size()
+        batch_dim, image_height, image_width, image_depth = image_batch.size()
         copy_x, copy_y = min(300, image_width), min(300, image_height)
 
         dest_x_offset = max(0, (300 - image_width) // 2)
@@ -75,14 +76,14 @@ def preprocess(image_tensor):
         dest_y_offset = max(0, (300 - image_height) // 2)
         source_y_offset = max(0, (image_height - 300) // 2)
 
-        input_tensor = torch.zeros((300, 300, 3), dtype=torch.float32, device=device)
-        input_tensor[dest_y_offset:dest_y_offset + copy_y, dest_x_offset:dest_x_offset + copy_x] = \
-            image_tensor[source_y_offset:source_y_offset + copy_y, source_x_offset:source_x_offset + copy_x]
+        input_batch = torch.zeros((batch_dim, 300, 300, 3), dtype=model_dtype, device=device)
+        input_batch[:, dest_y_offset:dest_y_offset + copy_y, dest_x_offset:dest_x_offset + copy_x] = \
+            image_batch[:, source_y_offset:source_y_offset + copy_y, source_x_offset:source_x_offset + copy_x]
 
         return torch.einsum(
-            'hwc -> chw',
-            normalize(input_tensor / 255)
-        )
+            'bhwc -> bchw',
+            normalize(input_batch / 255)
+        ).contiguous()
 
 
 def normalize(input_tensor):
@@ -127,8 +128,9 @@ try:
             print(f'{msg.src.name}: [{msg_type}] {text}')
             break
 finally:
-    print(f'FPS: {frames_processed / (time.time() - start_time):.2f}')
+    finish_time = time.time()
     open(f'logs/{os.path.splitext(sys.argv[0])[0]}.pipeline.dot', 'w').write(
         Gst.debug_bin_to_dot_data(pipeline, Gst.DebugGraphDetails.ALL)
     )
     pipeline.set_state(Gst.State.NULL)
+    print(f'FPS: {frames_processed / (finish_time - start_time):.2f}')

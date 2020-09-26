@@ -9,6 +9,7 @@ import numpy as np
 import torch, torchvision
 
 frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp32'
+model_dtype = torch.float16 if model_precision == 'fp16' else torch.float32
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 detector = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=model_precision).eval().to(device)
 ssd_utils = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd_processing_utils')
@@ -34,7 +35,7 @@ def on_frame_probe(pad, info):
         print(f'[{buf.pts / Gst.SECOND:6.2f}]')
 
         image_tensor = buffer_to_image_tensor(buf, pad.get_current_caps())
-        image_batch = preprocess(image_tensor).unsqueeze(0).to(device)
+        image_batch = preprocess(image_tensor.unsqueeze(0))
         frames_processed += image_batch.size(0)
 
         with torch.no_grad():
@@ -65,10 +66,10 @@ def buffer_to_image_tensor(buf, caps):
                 buf.unmap(map_info)
 
 
-def preprocess(image_tensor):
+def preprocess(image_batch):
     '300x300 centre crop, normalize, HWC -> CHW'
     with nvtx_range('preprocess'):
-        image_height, image_width, image_depth = image_tensor.size()
+        batch_dim, image_height, image_width, image_depth = image_batch.size()
         copy_x, copy_y = min(300, image_width), min(300, image_height)
 
         dest_x_offset = max(0, (300 - image_width) // 2)
@@ -76,14 +77,14 @@ def preprocess(image_tensor):
         dest_y_offset = max(0, (300 - image_height) // 2)
         source_y_offset = max(0, (image_height - 300) // 2)
 
-        input_tensor = torch.zeros((300, 300, 3), dtype=torch.float32, device=device)
-        input_tensor[dest_y_offset:dest_y_offset + copy_y, dest_x_offset:dest_x_offset + copy_x] = \
-            image_tensor[source_y_offset:source_y_offset + copy_y, source_x_offset:source_x_offset + copy_x]
+        input_batch = torch.zeros((batch_dim, 300, 300, 3), dtype=model_dtype, device=device)
+        input_batch[:, dest_y_offset:dest_y_offset + copy_y, dest_x_offset:dest_x_offset + copy_x] = \
+            image_batch[:, source_y_offset:source_y_offset + copy_y, source_x_offset:source_x_offset + copy_x]
 
         return torch.einsum(
-            'hwc -> chw',
-            normalize(input_tensor / 255)
-        )
+            'bhwc -> bchw',
+            normalize(input_batch / 255)
+        ).contiguous()
 
 
 def normalize(input_tensor):
@@ -121,7 +122,7 @@ def init_dboxes():
 
     return torch.tensor(
         dboxes,
-        dtype=(torch.float16 if model_precision == 'fp16' else torch.float32),
+        dtype=model_dtype,
         device=device
     ).clamp(0, 1)
 
@@ -164,17 +165,19 @@ def postprocess(locs, labels):
         flat_locs = locs.reshape(-1, 4).repeat_interleave(class_dim, dim=0)
         flat_probs = probs.view(-1)
         class_indexes = torch.arange(class_dim, device=device).repeat(batch_dim * box_dim)
+        image_indexes = (torch.ones(box_dim * class_dim, device=device) * torch.arange(1, batch_dim + 1, device=device).unsqueeze(-1)).view(-1)
 
         # only do NMS on detections over threshold, and ignore background (0)
         threshold_mask = (flat_probs > detection_threshold) & (class_indexes > 0)
         flat_locs = flat_locs[threshold_mask]
         flat_probs = flat_probs[threshold_mask]
         class_indexes = class_indexes[threshold_mask]
+        image_indexes = image_indexes[threshold_mask]
 
         nms_mask = torchvision.ops.boxes.batched_nms(
             flat_locs,
             flat_probs,
-            class_indexes,
+            class_indexes * image_indexes,
             iou_threshold=0.7
         )
 
@@ -213,8 +216,9 @@ try:
             print(f'{msg.src.name}: [{msg_type}] {text}')
             break
 finally:
-    print(f'FPS: {frames_processed / (time.time() - start_time):.2f}')
+    finish_time = time.time()
     open(f'logs/{os.path.splitext(sys.argv[0])[0]}.pipeline.dot', 'w').write(
         Gst.debug_bin_to_dot_data(pipeline, Gst.DebugGraphDetails.ALL)
     )
     pipeline.set_state(Gst.State.NULL)
+    print(f'FPS: {frames_processed / (finish_time - start_time):.2f}')
