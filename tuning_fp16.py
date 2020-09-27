@@ -8,14 +8,14 @@ from gi.repository import Gst
 import numpy as np
 import torch, torchvision
 
-frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp32'
+frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp16'
 model_dtype = torch.float16 if model_precision == 'fp16' else torch.float32
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 detector = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=model_precision).eval().to(device)
 ssd_utils = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd_processing_utils')
 detection_threshold = 0.4
 start_time, frames_processed = None, 0
-image_batch, batch_size = [], 4
+image_batch, batch_size = [], 8
 
 # context manager to help keep track of ranges of time, using NVTX
 @contextlib.contextmanager

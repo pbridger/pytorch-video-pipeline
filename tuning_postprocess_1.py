@@ -102,7 +102,7 @@ def postprocess(locs, labels):
 
 Gst.init()
 pipeline = Gst.parse_launch(f'''
-    filesrc location=media/in.mp4 num-buffers=200 !
+    filesrc location=media/in.mp4 num-buffers=256 !
     decodebin !
     nvvideoconvert !
     video/x-raw,format={frame_format} !
