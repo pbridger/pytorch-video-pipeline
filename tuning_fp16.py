@@ -208,7 +208,7 @@ pipeline = Gst.parse_launch(f'''
     filesrc location=media/in.mp4 num-buffers=256 !
     decodebin !
     nvvideoconvert !
-    video/x-raw(memory:NVMM),format={frame_format} !
+    video/x-raw,format={frame_format} !
     fakesink name=s
 ''')
 
