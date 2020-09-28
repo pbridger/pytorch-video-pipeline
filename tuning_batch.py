@@ -115,7 +115,7 @@ def init_dboxes():
     scales = [21, 45, 99, 153, 207, 261, 315]
     aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
 
-    fk = fig_size / np.array(steps)
+    fk = fig_size / torch.tensor(steps).float()
 
     dboxes = []
     # size of feature and number of feature

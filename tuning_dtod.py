@@ -5,8 +5,8 @@ import contextlib
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
-import numpy as np
 import torch, torchvision
+import ghetto_nvds
 
 frame_format, pixel_bytes, model_precision = 'RGBA', 4, 'fp16'
 model_dtype = torch.float16 if model_precision == 'fp16' else torch.float32
@@ -69,16 +69,28 @@ def buffer_to_image_tensor(buf, caps):
         is_mapped, map_info = buf.map(Gst.MapFlags.READ)
         if is_mapped:
             try:
-                image_array = np.ndarray(
-                    (height, width, pixel_bytes),
-                    dtype=np.uint8,
-                    buffer=map_info.data
+                source_surface = ghetto_nvds.NvBufSurface(map_info)
+                torch_surface = ghetto_nvds.NvBufSurface(map_info)
+
+                dest_tensor = torch.zeros(
+                    (torch_surface.surfaceList[0].height, torch_surface.surfaceList[0].width, 4),
+                    dtype=torch.uint8,
+                    device=device
                 )
-                return torch.from_numpy(
-                    image_array[:,:,:3].copy() # RGBA -> RGB, and extend lifetime beyond subsequent unmap
-                )
+
+                torch_surface.struct_copy_from(source_surface)
+                assert(source_surface.numFilled == 1)
+                assert(source_surface.surfaceList[0].colorFormat == 19) # RGBA
+
+                # make torch_surface map to dest_tensor memory
+                torch_surface.surfaceList[0].dataPtr = dest_tensor.data_ptr()
+
+                # copy decoded GPU buffer (source_surface) into Pytorch tensor (torch_surface -> dest_tensor)
+                torch_surface.mem_copy_from(source_surface)
             finally:
                 buf.unmap(map_info)
+
+            return dest_tensor[:, :, :3]
 
 
 def preprocess(image_batch):

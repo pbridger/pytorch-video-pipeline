@@ -15,7 +15,7 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
 ENV PATH /opt/conda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/cuda-10.2/compat:/opt/conda/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /usr/local/cuda-10.2/compat:/opt/conda/lib:/opt/nvidia/deepstream/deepstream-5.0/lib:${LD_LIBRARY_PATH}
 
 RUN conda install -y -c pytorch \
     cudatoolkit=10.2 \
