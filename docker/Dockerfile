@@ -31,6 +31,9 @@ RUN git clone https://github.com/NVIDIA/apex.git /build/apex
 WORKDIR /build/apex
 RUN pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" .
 
+RUN pip install --upgrade cython
+RUN pip install --upgrade gil_load
+
 # Gstreamer debug output location
 env GST_DEBUG_DUMP_DOT_DIR=/app/logs
 

@@ -2,7 +2,7 @@
 DOCKER_CMD := docker run -it --rm --gpus=all --privileged=true --ipc=host -v $(shell pwd):/app
 DOCKER_PY_CMD := ${DOCKER_CMD} --entrypoint=python
 DOCKER_NSYS_CMD := ${DOCKER_CMD} --entrypoint=nsys
-PROFILE_CMD := profile -t cuda,cublas,cudnn,nvtx,osrt --force-overwrite=true --delay=2
+PROFILE_CMD := profile -t cuda,cublas,cudnn,nvtx,osrt --force-overwrite=true --delay=2 --duration=30
 
 PROFILE_TARGETS = logs/tuning_baseline.qdrep logs/tuning_postprocess_1.qdrep
 
