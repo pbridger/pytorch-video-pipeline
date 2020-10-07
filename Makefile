@@ -43,5 +43,8 @@ sleep:
 	@sleep 2
 	@echo "---"
 
-all: cli.pipeline.png frames_into_python.pipeline.png frames_into_pytorch.pipeline.png
+
+pipeline: cli.pipeline.png frames_into_python.pipeline.png frames_into_pytorch.pipeline.png
+
+tuning: logs/tuning_baseline.qdrep logs/tuning_postprocess_1.qdrep logs/tuning_postprocess_2.qdrep logs/tuning_batch.qdrep logs/tuning_fp16.qdrep logs/tuning_dtod.qdrep logs/tuning_concurrency.qdrep
 
